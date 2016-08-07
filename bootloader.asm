@@ -4,10 +4,11 @@
 ;;; 0x00000500       - (0x500 + 0x18*num_entries) Memory map
 ;;; 0x0000????       - 0x7bff Stack
 ;;; 0x00007c00       - 0x8fff Bootloader
-;;; 0x00009000       - 0x9fff GDT & whatever data follows it.
-;;; 0x0000a000       - 0xafff IDT
-;;; 0x0000b000       - 0xcfff Kernel
-;;; 0x0000d000       - 0x0000ffff Free (4 pages)
+;;; 0x00009000       - 0x9fff Bootloader IDT
+;;; 0x0000a000       - 0xafff Kernel IDT
+;;; 0x0000b000       - 0xbfff GDT & whatever data follows it.
+;;; 0x0000c000       - 0xdfff Kernel
+;;; 0x0000e000       - 0x0000ffff Free (3 pages)
 ;;; 0x00010000       - 0x00010fff Default PML4
 ;;; 0x00011000       - 0x00011fff Default PDP
 ;;; 0x00012000       - 0x00012fff Default PD (2 mib identity mapped)
@@ -153,7 +154,7 @@ mov si, drive_read_error_message
 
 ;;Read the second stage of the bootloader.
 pop dx ;Pop drive number from the stack
-mov ax, 0x0209 ;0x1200 bytes (9 sectors)
+mov ax, 0x0211 ;0x2200 bytes (0x11 sectors)
 mov cx, 0x0002 ;Cylinder, Sector (one indexed)
 mov dh, 0x00   ;Head
 mov bx, 0x7e00 ;Buffer address
@@ -404,7 +405,7 @@ mov [es:di], eax
 mov di, 0x5fe0      ;;Add fourth to last entry in PD
 mov eax, 0x00016003
 mov [es:di], eax
-mov eax, 0x0000b003 ;;Add first four entries to PT
+mov eax, 0x0000c003 ;;Add first four entries to PT
 mov cx, 0x0004
 mov di, 0x6000
 fill_2nd_page_table:
@@ -503,9 +504,16 @@ idt_pointer:
 dw 0x1000
 dq 0x0000000000009000
 align 16
+kernel_idt_pointer:
+dw 0x1000
+dq 0x000000000000a000
+align 16
 gdt_pointer:
 dw 0x0020
-dq 0x000000000000a000
+dq 0x000000000000b000
 
 times 0x1200-($-second_stage) db 0 ;Pad to 0x1200 bytes.
+
+bootloader_idt: ;One page.
+%include "bootloader_idt.asm"
 

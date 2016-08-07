@@ -3,10 +3,6 @@
 
 pop rcx ; Number of entries in memory map.
 
-;; Jump to kernel
-mov rax, 0xffffff7fbf800000
-jmp rax
-
 search_for_rsdp:
    xor edi, edi
    mov di, [abs 0x040e] ;EBDA address
@@ -34,7 +30,6 @@ search_for_rsdp:
       mov rsi, rsdp_not_found_message
       jmp panic
    .found:
-
 
 read_rsdp:
    mov rsi, rdi
@@ -125,10 +120,13 @@ read_madt:
       sub ecx, eax
       jg .loop
 
-   mov r14, 0xfee00020
-   mov r15d, [r14]
-   mov bl, 0x07
-   call print_r15_64
+cli
+hlt
+
+;; Jump to kernel
+mov rax, 0xffffff7fbf800000
+jmp rax
+
 
 ;;Test ACPI checksum at rsi with a length of rcx bytes.
 test_checksum:
@@ -237,11 +235,29 @@ print_r15_64:
    pop rcx
    ret
 
+interrupt_routine:
+   mov rsi, interrupt_message
+   mov rbx, 0x07
+   call print_64
+   cli
+   hlt
+
+page_fault_isr:
+   mov rsi, page_fault_message
+   mov rbx, 0x4f
+   call print_64
+   mov r15, cr2
+   call print_r15_64
+   cli
+   hlt
+
 cursor_location_64: dd 0x00000000
 acpi_table_name: dd 0
 db 0 ;acpi_table_name trailing null.
 next_free_page: dq 0x18000
 
+interrupt_message: db "Encountered interrupt!", 0x00
+page_fault_message: db "Boot: Page fault! CR2:", 0x00
 no_acpi_region_in_memory_map: db \
 "                Sorry, the memory map didn't have an ACPI region!               ", 0x00
 acpi_region_too_large: db \
