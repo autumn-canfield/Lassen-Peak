@@ -5,6 +5,7 @@ A hobby OS project.
 So far I have only implemented the bootloader.
 
 Here's what the bootloader does so far:
+
 1. Configures vga 80x25 text mode.
 2. Sets the vga colors.
 3. Enables the A20 line.
