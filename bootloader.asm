@@ -102,7 +102,7 @@ mov cx, 0x08
 mov dx, vga_color_palette_data + 0x15
 int 0x10
 
-;;Uncomment to print all combinations of background and foreground colors then halt.
+;;Uncomment to print all combinations of background and foreground colors.
 ;mov ax, 0xb800
 ;mov fs, ax
 ;xor ax, ax
@@ -117,6 +117,7 @@ int 0x10
 ;   .end:
 ;   cmp bx, 0x1000
 ;   jne color_loop
+;cli
 ;hlt
 
 
