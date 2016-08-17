@@ -81,6 +81,15 @@ read_rsdt:
    .loop:
       mov eax, [rsi+rbx*4+rsdt_header_size]
       mov ebp, [rax]
+         ;push rbx
+         ;push rsi
+         ;mov [rel acpi_table_name], rbp
+         ;mov ebx, 0x07
+         ;mov rsi, acpi_table_name
+         ;call print_64
+         ;call print_newline
+         ;pop rsi
+         ;pop rbx
       cmp ebp, 0x43495041 ;APIC
       jne .continue
          or edi, 0x01
@@ -103,6 +112,15 @@ read_xsdt:
    .loop:
       mov rax, [rsi+rbx*8+rsdt_header_size]
       mov ebp, [rax]
+         ;push rbx
+         ;push rsi
+         ;mov [rel acpi_table_name], rbp
+         ;mov ebx, 0x07
+         ;mov rsi, acpi_table_name
+         ;call print_64
+         ;call print_newline
+         ;pop rsi
+         ;pop rbx
       cmp ebp, 0x43495041 ;APIC
       jne .continue
          or edi, 0x01
