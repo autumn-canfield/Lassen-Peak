@@ -1,7 +1,27 @@
 ;;; This file is included by loader.asm right after entering long mode.
 ;;; This code sets things up then jumps to the kernel.
 
-pop rcx ; Number of entries in memory map.
+pop rdx ; Number of entries in memory map.
+map_acpi_regions:
+   mov esi, 0x0500
+   .loop:
+      mov eax, [esi + 0x10]
+      cmp eax, 0x03
+      je .map
+      cmp eax, 0x04
+      je .map
+      add esi, 0x18
+      sub rdx, 0x01
+      jz .end
+      jmp .loop
+   .map:
+      mov rdi, [esi]
+      mov rcx, [esi + 0x08]
+      call map_memory
+      add esi, 0x18
+      sub rdx, 0x01
+      jmp .loop
+   .end:
 
 search_for_rsdp:
    xor edi, edi
@@ -235,6 +255,74 @@ print_r15_64:
    pop rcx
    ret
 
+;0xffff000000000000 ;sign extend
+;0x0000ff8000000000 ;pml4
+;0x0000007fc0000000 ;pdp
+;0x000000003fe00000 ;pd
+;0x00000000001ff000 ;pt
+;0x0000000000000fff ;offset
+;0x000ffffffffff000
+;;rdi: address  rcx: length
+%define min_free_page_address 0x17000
+%define pml4_address 0x10000
+map_memory:
+   push rdi
+   push rax
+   push rcx
+   push rbx
+   add rcx, rdi
+   mov rbx, 0xffffffffffe00000
+   and rdi, rbx
+   .pml4:
+      mov rbx, pml4_address
+      mov rax, 0x0000ff8000000000
+      and rax, rdi
+      shr rax, 36
+      add rax, rbx
+      call map_page_entry
+   .pdp:
+      mov rax, 0x000ffffffffff000
+      and rbx, rax
+      mov rax, 0x0000007fc0000000
+      and rax, rdi
+      shr rax, 27
+      add rax, rbx
+      call map_page_entry
+   .pd:
+      mov rax, 0x000ffffffffff000
+      and rbx, rax
+      mov rax, 0x000000003fe00000
+      and rax, rdi
+      shr rax, 18
+      add rax, rbx
+      mov [rax], rdi
+      or qword [rax], 0x83
+      add rdi, 0x200000
+      cmp rdi, rcx
+      jl .continue
+         pop rbx
+         pop rcx
+         pop rax
+         pop rdi
+         ret
+      .continue:
+      jmp .pml4
+
+;;Ensures that the entry has a table allocated.
+;;rax: entry_address  (return)rbx: entry_value
+map_page_entry:
+   mov rbx, [rax]
+   test rbx, 0x01
+   jz .allocate_table
+      ret
+   .allocate_table:
+      mov rbx, [rel next_free_page]
+      sub qword [rel next_free_page], 0x1000
+      or rbx, 0x3
+      mov [rax], rbx
+      xor rbx, 0x3
+      ret
+
 ;;rsi: isr_address  rdi:irq
 install_isr:
    push rcx
@@ -294,14 +382,10 @@ spurious_interrupt_count: dd 0
 cursor_location_64: dd 0x00000000
 acpi_table_name: dd 0
 db 0 ;acpi_table_name trailing null.
-next_free_page: dq 0x18000
+next_free_page: dq 0x79000 ;Grows down
 
 interrupt_message: db "Encountered interrupt!", 0x00
 page_fault_message: db "Boot: Page fault! CR2:", 0x00
-no_acpi_region_in_memory_map: db \
-"                Sorry, the memory map didn't have an ACPI region!               ", 0x00
-acpi_region_too_large: db \
-"                      Sorry, the ACPI region is too large!                      ", 0x00
 rsdp_not_found_message: db \
 "                        Sorry, we couldn't find the RSDP!                       ", 0x00
 bad_acpi_checksum_message: db \
