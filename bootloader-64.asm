@@ -268,6 +268,10 @@ print_newline:
 print_r15_64:
    push rcx
    push r15
+   push rdi
+   push rdx
+   push r9
+   push r8
    mov rdi, 0xb8000
    add edi, [cursor_location_64]
    mov ecx, 0x10
@@ -287,6 +291,10 @@ print_r15_64:
       add [cursor_location_64], dword 0x02
       sub rcx, 0x01
       jnz .loop
+   pop r8
+   pop r9
+   pop rdx
+   pop rdi
    pop r15
    pop rcx
    ret
