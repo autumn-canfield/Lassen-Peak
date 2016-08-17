@@ -1,6 +1,6 @@
 bits 64
 default rel
-org 0xffffff7fbf7fe000
+org 0xffffff7fbf800000
 
 %include "kernel_data.asm"
 
@@ -142,5 +142,5 @@ xsdt_not_supported_message: db \
 madt_not_found_message: db \
 "                        Sorry, we couldn't find the MADT!                       ", 0x00
 
-times 0xe000-($-kernel_entry) db 0 ; Pad kernel to 16 kib
+times 0x3000-($-kernel_entry) db 0
 

@@ -3,11 +3,9 @@
 ;;; 0x00000400       - 0x04ff Bios data area
 ;;; 0x00000500       - (0x500 + 0x18*num_entries) Memory map
 ;;; 0x0000????       - 0x7bff Stack
-;;; 0x00007c00       - 0x8fff Bootloader
-;;; 0x00009000       - 0x9fff Bootloader IDT
-;;; 0x0000a000       - 0xafff Kernel IDT
-;;; 0x0000b000       - 0xbfff GDT & whatever data follows it.
-;;; 0x0000c000       - 0xdfff Kernel
+;;; 0x00007c00       - 0x9fff Bootloader
+;;; 0x0000a000       - 0xafff GDT & kernel data
+;;; 0x0000b000       - 0xefff Kernel (3 pages)
 ;;; 0x0000e000       - 0x0000ffff Free (3 pages)
 ;;; 0x00010000       - 0x00010fff Default PML4
 ;;; 0x00011000       - 0x00011fff Default PDP
@@ -16,7 +14,9 @@
 ;;; 0x00014000       - 0x00014fff Kernel PDP
 ;;; 0x00015000       - 0x00015fff Kernel PD
 ;;; 0x00016000       - 0x00016fff Kernel PT
-;;; 0x00017000       - 0x0009fbff Free (135 pages typ)
+;;; 0x00017000       - 0x00017fff IDT
+;;; 0x00018000       - 0x0007ffff Guaranteed free (104 pages)
+;;; 0x00080000       - 0x0009fbff Possibly free depending on EBDA
 ;;; 0x0009fc00 (typ) - 0x0009ffff Extended bios data area
 ;;; 0x000a0000       - 0x000bffff Video memory
 ;;; 0x000c0000       - 0x000fffff Rom area
@@ -161,11 +161,11 @@ mov bx, 0x7e00 ;Buffer address
 int 0x13
 jc panic16
 
-;;Read the kernel to 0x8000
+;;Read the kernel to 0xa000
 mov ax, 0x0220 ;16 kib (0x20 sectors)
 mov cx, 0x000b ;Cylinder, Sector
 mov dh, 0x00   ;Head
-mov bx, 0x9000 ;Buffer address
+mov bx, 0xa000 ;Buffer address
 int 0x13
 jc panic16
 
@@ -356,18 +356,20 @@ int 0x15
 
 ;; Because the PICs can still generate spurious IRQs even when they are
 ;; disabled we stil have to remap the IRQs.
+;; Master PIC spurious irq: 0xed
+;; Slave PIC spurious irq: 0xee
 mov al, 0x11 ;;Start PIC initialization
 out 0x20, al
 out 0xa0, al
-mov al, 0x20 ;;Remap the PICs' IRQs
+mov al, 0xe6 ;;Remap the PICs' IRQs
 out 0x21, al
-mov al, 0x28
+mov al, 0xe7
 out 0xa1, al
 mov al, 0x04 ;;Setup master/slave arrangement
 out 0x21, al
 mov al, 0x02
 out 0xa1, al
-mov al, 0x01 ;;Set PICs to default mode (I think)
+mov al, 0x01 ;;Set PICs to 8086 mode
 out 0x21, al
 out 0xa1, al
 mov al, 0xff ;;Disable PICs
@@ -405,7 +407,7 @@ mov [es:di], eax
 mov di, 0x5fe0      ;;Add fourth to last entry in PD
 mov eax, 0x00016003
 mov [es:di], eax
-mov eax, 0x0000c003 ;;Add first four entries to PT
+mov eax, 0x0000a003 ;;Add first four entries to PT
 mov cx, 0x0004
 mov di, 0x6000
 fill_2nd_page_table:
@@ -446,7 +448,31 @@ bootloader_64:
    mov gs, ax
    xor ax, ax
    mov ss, ax
+
+   mov edi, 0x17000
+   mov rax, 0x00000e0000080000
+   xor ebx, ebx
+   mov ecx, 0x100
+   .idt_loop:
+      mov [rdi], rax
+      mov [rdi+0x08], rbx
+      add edi, 0x10
+      sub ecx, 0x01
+      jnz .idt_loop
+   mov rsi, page_fault_isr
+   mov rdi, 0x0e
+   call install_isr
+   mov rsi, mpic_spurious_isr
+   mov rdi, 0xed
+   call install_isr
+   mov rsi, spic_spurious_isr
+   mov rdi, 0xee
+   call install_isr
+   mov rsi, spurious_isr
+   mov rdi, 0xef
+   call install_isr
    lidt [idt_pointer]
+
    %include "bootloader-64.asm" ;Does some setup then jumps to the kernel.
 
 bits 16
@@ -502,18 +528,11 @@ dd 0x00000000
 align 16
 idt_pointer:
 dw 0x1000
-dq 0x0000000000009000
-align 16
-kernel_idt_pointer:
-dw 0x1000
-dq 0x000000000000a000
+dq 0x0000000000017000
 align 16
 gdt_pointer:
 dw 0x0020
 dq 0x000000000000b000
 
-times 0x1200-($-second_stage) db 0 ;Pad to 0x1200 bytes.
-
-bootloader_idt: ;One page.
-%include "bootloader_idt.asm"
+times 0x2200-($-second_stage) db 0
 

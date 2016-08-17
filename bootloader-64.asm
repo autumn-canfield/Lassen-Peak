@@ -124,7 +124,7 @@ cli
 hlt
 
 ;; Jump to kernel
-mov rax, 0xffffff7fbf800000
+mov rax, 0xffffff7fbf801000
 jmp rax
 
 
@@ -235,12 +235,47 @@ print_r15_64:
    pop rcx
    ret
 
+;;rsi: isr_address  rdi:irq
+install_isr:
+   push rcx
+   shl rdi, 4
+   add rdi, 0x17000
+   mov rcx, 0xffff
+   and rcx, rsi
+   or ecx, 0x00080000
+   mov [rdi], ecx
+   mov rcx, 0xffff0000
+   and rcx, rsi
+   or rcx, 0x8e00
+   mov [rdi+4], ecx
+   mov rcx, rsi
+   shr rcx, 0x20
+   mov [rdi+8], ecx
+   pop rcx
+   ret
+
 interrupt_routine:
    mov rsi, interrupt_message
    mov rbx, 0x07
    call print_64
    cli
    hlt
+
+mpic_spurious_isr:
+   add [rel spurious_interrupt_count], dword 0x1
+   add [rel mspurious_interrupt_count], dword 0x1
+   iretq
+
+spic_spurious_isr:
+   add [rel spurious_interrupt_count], dword 0x1
+   add [rel sspurious_interrupt_count], dword 0x1
+   ;Sending an EOI to the Master PIC is not needed b/c Slave->Master irq is masked.
+   iretq
+
+spurious_isr:
+   add [rel spurious_interrupt_count], dword 0x1
+   add [rel aspurious_interrupt_count], dword 0x1
+   iretq
 
 page_fault_isr:
    mov rsi, page_fault_message
@@ -250,6 +285,11 @@ page_fault_isr:
    call print_r15_64
    cli
    hlt
+
+mspurious_interrupt_count: dd 0
+sspurious_interrupt_count: dd 0
+aspurious_interrupt_count: dd 0
+spurious_interrupt_count: dd 0
 
 cursor_location_64: dd 0x00000000
 acpi_table_name: dd 0
