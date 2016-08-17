@@ -77,16 +77,19 @@ read_rsdt:
    sub ecx, rsdt_header_size
    shr ecx, 2
    xor ebx, ebx
+   xor edi, edi ;Table flags
    .loop:
       mov eax, [rsi+rbx*4+rsdt_header_size]
       mov ebp, [rax]
       cmp ebp, 0x43495041 ;APIC
-      je read_madt
+      jne .continue
+         or edi, 0x01
+         mov [rel madt_address], rax
+      .continue:
       add ebx, 1
       sub ecx, 1
       jnz .loop
-   mov rsi, madt_not_found_message
-   jmp panic
+   jmp test_table_flags
 
 read_xsdt:
    mov rsi, rax
@@ -96,24 +99,32 @@ read_xsdt:
    sub ecx, rsdt_header_size
    shr ecx, 3
    xor ebx, ebx
+   xor edi, edi ;Table flags
    .loop:
       mov rax, [rsi+rbx*8+rsdt_header_size]
       mov ebp, [rax]
       cmp ebp, 0x43495041 ;APIC
-      je read_madt
+      jne .continue
+         or edi, 0x01
+         mov [rel madt_address], rax
+      .continue:
       add ebx, 1
       sub ecx, 1
       jnz .loop
+
+test_table_flags:
    mov rsi, madt_not_found_message
-   jmp panic
+   test rdi, 0x01
+   jz panic
 
 %define madt_header_size 44
 read_madt:
-   mov esi, eax
+   mov rsi, [rel madt_address]
    mov ecx, [rsi+0x04]
    call test_checksum
 
-   ;mov r15d, [rsi+36] ;local apic address
+   mov r15d, [rsi+36] ;local apic address
+   mov [rel lapic_address], r15
 
    sub ecx, madt_header_size
    add rsi, madt_header_size
@@ -121,27 +132,52 @@ read_madt:
    mov bl, 0x07
    .loop:
       mov r15, [rsi]
-      call print_r15_64
+      ;call print_r15_64
       and r15, 0xff
       jz .continue
-      add [cursor_location_64], dword 2
+      cmp r15b, 0x01
+      jne .not_ioapic
+         mov r14d, [rsi+4]
+         mov [rel ioapic_address], r14d
+         mov r14b, [rsi+2]
+         mov [rel ioapic_id], r14b
+      .not_ioapic:
+      cmp r15b, 0x02
+      jne .not_override
+         mov r13d, [rsi+4]
+         mov r14b, [rsi+3]
+         cmp r14b, 0x00
+         jne .keyboard_irq
+            mov [rel pit_irq], r13b
+         .keyboard_irq:
+         cmp r14b, 0x01
+         jne .not_override
+            mov [rel keyboard_irq], r13b
+      .not_override:
+      ;add [cursor_location_64], dword 2
       cmp r15, 0x02
       je .two
          mov r15d, [rsi+8]
-         call print_r15_64
+         ;call print_r15_64
       jmp .continue
       .two:
          movzx r15, word [rsi+8]
-         call print_r15_64
+         ;call print_r15_64
       .continue:
-      call print_newline
+      ;call print_newline
       movzx rax, byte [rsi+1]
       add rsi, rax
       sub ecx, eax
       jg .loop
 
-cli
-hlt
+      mov rdi, [rel ioapic_address]
+      mov rcx, 0x1000
+      call map_memory
+      mov rdi, [rel lapic_address]
+      mov rcx, 0x1000
+      call map_memory
+      mov eax, 0x01ef ;;Enable lapic and set spurious irq to 0xef.
+      mov [rdi+0xf0], eax
 
 ;; Jump to kernel
 mov rax, 0xffffff7fbf801000
@@ -374,6 +410,14 @@ page_fault_isr:
    cli
    hlt
 
+madt_address: dq 0
+
+lapic_address: dq 0
+ioapic_address: dq 0
+ioapic_id: dd 0
+
+pit_irq: db 0
+keyboard_irq: db 1
 mspurious_interrupt_count: dd 0
 sspurious_interrupt_count: dd 0
 aspurious_interrupt_count: dd 0
