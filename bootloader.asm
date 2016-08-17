@@ -218,7 +218,6 @@ mov eax, 0x0000e820
 int 0x15
 mov si, mem_detect_error_message
 jc panic16
-;call print_mem_map
 inc bp
 
 mem_detect_loop:
@@ -228,7 +227,6 @@ mem_detect_loop:
    mov ecx, 0x00000018
    int 0x15
    pushfd
-   ;call print_mem_map
    inc bp
    or ebx, ebx
    jz mem_detect_done
@@ -239,51 +237,55 @@ mem_detect_loop:
    mov si, mem_detect_error_message
    jmp panic16
 
-;; Uncomment this to print the memory map for debugging.
-;print_mem_map:
-;   pusha
-;   pushfd
-;   mov si, di
-;
-;   mov ax, bp
-;   mov cx, 0xa0
-;   mul cx
-;   mov di, ax
-;
-;   mov bx, [si + 0x06]
-;   call print_bx
-;   mov bx, [si + 0x04]
-;   call print_bx
-;   mov bx, [si + 0x02]
-;   call print_bx
-;   mov bx, [si]
-;   call print_bx
-;
-;   add di, 0x02 ; Skip one space
-;   mov bx, [si + 0x0e]
-;   call print_bx
-;   mov bx, [si + 0x0c]
-;   call print_bx
-;   mov bx, [si + 0x0a]
-;   call print_bx
-;   mov bx, [si + 0x08]
-;   call print_bx
-;
-;   add di, 0x02 ; Skip one space
-;   mov bx, [si + 0x10]
-;   call print_bx
-;
-;   mov di, si
-;   popfd
-;   popa
-;   ret
-
 mem_detect_done:
    xor di, di ;;Save number of entries padded to 64 bits.
    push di
    push di
    push di
    push bp
+
+;; Uncomment this to print the memory map for debugging.
+;print_mem_map:
+;   mov si, 0x500
+;   xor cx, cx
+;
+;   .loop:
+;      mov bx, [si + 0x10]
+;      cmp bx, 0x01 ;Filter out a particular type
+;      jne .continue
+;
+;      mov bx, [si + 0x06]
+;      call print_bx
+;      mov bx, [si + 0x04]
+;      call print_bx
+;      mov bx, [si + 0x02]
+;      call print_bx
+;      mov bx, [si]
+;      call print_bx
+;
+;      add di, 0x02
+;      mov bx, [si + 0x0e]
+;      call print_bx
+;      mov bx, [si + 0x0c]
+;      call print_bx
+;      mov bx, [si + 0x0a]
+;      call print_bx
+;      mov bx, [si + 0x08]
+;      call print_bx
+;
+;      add di, 0x02
+;      mov bx, [si + 0x10]
+;      call print_bx
+;
+;      add di, 0x54
+;   .continue
+;      add si, 0x18
+;      add cx, 1
+;      cmp cx, bp
+;      jl .loop
+;   cli
+;   hlt
+
    
    jmp second_stage
 
@@ -496,31 +498,35 @@ lgdt [gdt_pointer]
 
 
 ;; Print bx in hex at position in di. (Commented to save space when not debugging.)
-;print_bx:
-;   push si
-;   mov ax, 0xb800
-;   mov es, ax
-;   
-;   mov cx, 0x4
-;   mov si, 0x30
-;   mov bp, 0x57 
-;   
-;   .loop:
-;   mov dl, bh
-;   shr dl, 4
-;   cmp dl, 0x09
-;   cmovle ax, si 
-;   cmovg ax, bp
-;   add al, dl
-;   mov ah, 0x07
-;   stosw
-;   shl bx, 4
-;   loop .loop
-;   
-;   xor ax, ax
-;   mov es, ax
-;   pop si
-;   ret
+print_bx:
+   push si
+   push bp
+   push cx
+   mov ax, 0xb800
+   mov es, ax
+
+   mov cx, 0x4
+   mov si, 0x30
+   mov bp, 0x57
+
+   .loop:
+   mov dl, bh
+   shr dl, 4
+   cmp dl, 0x09
+   cmovle ax, si
+   cmovg ax, bp
+   add al, dl
+   mov ah, 0x07
+   stosw
+   shl bx, 4
+   loop .loop
+
+   xor ax, ax
+   mov es, ax
+   pop cx
+   pop bp
+   pop si
+   ret
 
 align 16
 dummy_idt:
