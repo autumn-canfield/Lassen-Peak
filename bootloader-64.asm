@@ -197,6 +197,38 @@ read_madt:
       mov eax, 0x01ef ;;Enable lapic and set spurious irq to 0xef.
       mov [rdi+0xf0], eax
 
+
+mov rsi, pit_isr
+mov rdi, 0x30
+call install_isr
+
+mov al, [rel pit_irq]
+shl al, 1
+add al, 0x10
+mov rdi, [rel ioapic_address]
+mov [rdi], al
+mov rbx, 0x00000030
+mov [rdi+0x10], ebx
+add al, 1
+mov [rdi], al
+xor ebx, ebx
+mov [rdi+0x10], ebx
+
+mov al, 0x30
+out 0x43, al
+mov al, 0x9c
+out 0x40, al
+mov al, 0x2e
+out 0x40, al
+
+rdtsc
+mov [rel tsc_value], eax
+mov [rel tsc_value+4], edx
+
+sti
+hlt
+cli
+
 ;; Jump to kernel
 mov rax, 0xffffff7fbf801000
 jmp rax
@@ -404,6 +436,22 @@ install_isr:
    pop rcx
    ret
 
+;;11932(0x2e9c) clocks = 10.0001508571 ms (0x00000002540e3149 ps)
+pit_isr:
+   push rax
+   push rdx
+   rdtsc
+   shl rdx, 32
+   or rdx, rax
+   mov rax, [rel tsc_value]
+   sub rdx, rax
+   mov [rel tsc_value], rdx
+   mov eax, [rel lapic_address] ;;EOI
+   mov [rax+0xb0], eax
+   pop rdx
+   pop rax
+   iretq
+
 interrupt_routine:
    mov rsi, interrupt_message
    mov rbx, 0x07
@@ -441,6 +489,9 @@ madt_address: dq 0
 lapic_address: dq 0
 ioapic_address: dq 0
 ioapic_id: dd 0
+
+tsc_value: dq 0
+pit_flag: db 0
 
 pit_irq: db 0
 keyboard_irq: db 1
