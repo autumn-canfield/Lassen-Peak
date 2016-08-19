@@ -357,6 +357,8 @@ mov ax, 0xec00
 mov bx, 0x0002
 int 0x15
 
+cli
+
 ;; Because the PICs can still generate spurious IRQs even when they are
 ;; disabled we stil have to remap the IRQs.
 ;; Master PIC spurious irq: 0xed
