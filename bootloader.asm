@@ -1,3 +1,10 @@
+;;; Map of image
+;;; 0x0000 len=0x0200 phys=0x07c00 Bootsector
+;;; 0x0200 len=0x1200 phys=0x07e00 Second Stage
+;;; 0x1400 len=0x1000 phys=0x09000 AP Init
+;;; 0x2400 len=0x1000 phys=0x0a000 Kernel Data (GDT)
+;;; 0x3400 len=0x3000 phys=0x0b000 Kernel
+;;;
 ;;; Map of physical memory below 1 mib:
 ;;; 0x00000000       - 0x03ff Default interrupt vector table
 ;;; 0x00000400       - 0x04ff Bios data area
@@ -6,10 +13,10 @@
 ;;; 0x00007c00       - 0x9fff Bootloader
 ;;; 0x0000a000       - 0xafff GDT & kernel data
 ;;; 0x0000b000       - 0xefff Kernel (3 pages)
-;;; 0x0000e000       - 0x0000ffff Free (3 pages)
+;;; 0x0000f000       - 0x0000ffff Free (3 pages)
 ;;; 0x00010000       - 0x00010fff Default PML4
 ;;; 0x00011000       - 0x00011fff Default PDP
-;;; 0x00012000       - 0x00012fff Default PD (2 mib identity mapped)
+;;; 0x00012000       - 0x00012fff Default PD (first 2mib identity mapped)
 ;;; 0x00013000       - 0x00013fff Free
 ;;; 0x00014000       - 0x00014fff Kernel PDP
 ;;; 0x00015000       - 0x00015fff Kernel PD
@@ -21,6 +28,8 @@
 ;;; 0x000a0000       - 0x000bffff Video memory
 ;;; 0x000c0000       - 0x000fffff Rom area
 ;;;
+;;; 0x00000000 contains info as specified in "boot-info-table.asm"
+;;;
 ;;; The default page tables map the kernel to 0xffffff7fbf800000.
 ;;; 
 ;;; Once the kernel has setup an idt, created a new stack, and is done with the
@@ -30,15 +39,6 @@
 ;;; initial page tables to higher addresses and reading more sectors for the
 ;;; kernel. However, if it grows larger than 1 mib we have to either load the
 ;;; rest in first part of the kernel, or switch to unreal mode.
-;;;
-;;; Output of print_mem_map in bochs (using "memory: guest=32"):
-;;; address          length           type
-;;; 0000000000000000 000000000009f000 0001
-;;; 000000000009f000 0000000000001000 0002
-;;; 00000000000e8000 0000000000018000 0002
-;;; 0000000000100000 0000000001ef0000 0001
-;;; 0000000001ff0000 0000000000010000 0003
-;;; 00000000fffc0000 0000000000040000 0002
 ;;; 
 ;;; Initial page tables identity-map memory from 0x00000000 to 0x40000000.
 ;;;
@@ -52,27 +52,28 @@ org 0x7c00
 start:
 jmp 0x0000:_start
 _start:
-
-xor ax, ax ;;Zero segment registers
+xor ax, ax ;Zero segment registers
 mov ss, ax
 mov ds, ax
 mov es, ax
 
-mov sp, 0x7c00 ;Note: The stack doesn't overwrite the bootsector because it grows down.
+mov sp, 0x7c00 ;nb The stack doesn't overwrite the bootsector because it grows down.
 
-and dl, 0xff ;;Push drive number to the stack.
+and dl, 0xff ;Push drive number to the stack.
 push dx
 
-;; Change vga settings
-xor ah, ah
-mov al, 0x03 ;0x30 = 80x25 text mode.
+mov ax, 0x0003 ;Change vga settings
 int 0x10
 
-mov ax, 0x1003 ;Disable blinking so we can use all 16 colors as a background.
+mov ax, 0x1112 ;Set 8x8 font => 80x50
 xor bl, bl
 int 0x10
 
-mov ah, 0x01 ;;Hide the cursor
+mov ax, 0x1003 ;Disable blinking so background can be all 16 colors.
+xor bl, bl
+int 0x10
+
+mov ah, 0x01 ;Hide the cursor
 mov cx, 0x2d0e
 int 0x10
 
@@ -86,17 +87,14 @@ mov bx, 0x01
 mov cx, 0x05
 mov dx, vga_color_palette_data
 int 0x10
-
 mov bx, 0x14
 mov cx, 0x01
 mov dx, vga_color_palette_data + 0xf
 int 0x10
-
 mov bx, 0x07
 mov cx, 0x01
 mov dx, vga_color_palette_data + 0x12
 int 0x10
-
 mov bx, 0x38
 mov cx, 0x08
 mov dx, vga_color_palette_data + 0x15
@@ -120,29 +118,24 @@ int 0x10
 ;cli
 ;hlt
 
-
 ;;Enable A20
 xor ax, ax
 not ax
 mov es, ax
 call test_a20
 jne a20_enabled
-
 enable_a20:
    mov ax, 0x2401
    int 0x15
    call test_a20
    jne a20_enabled
-
    mov si, a20_error_message
-   call panic16
-
+   jmp panic16
 test_a20:
    mov word [0x7dfe], 0xabcd
    mov cx, [es:0x7e0e]
    cmp cx, 0xabcd
    ret
-
 a20_enabled:
 xor ax, ax
 mov es, ax
@@ -158,10 +151,9 @@ mov bx, 0x7e00 ;Destination address
 int 0x13
 jc panic16
 
-
-;;Check if long mode is supported
-mov si, no_long_mode_message
-
+;;Check if long mode and invariant tsc are supported
+mov si, cpu_not_supported_message
+pushfd
 pushfd
 mov ecx, [esp]
 xor dword [esp],0x00200000
@@ -170,19 +162,76 @@ pushfd
 pop eax
 xor eax, ecx
 jz panic16
-
+popfd
 mov eax, 0x80000000
 cpuid
-cmp eax, 0x80000001
+cmp eax, 0x80000007
 jb panic16
-
 mov eax, 0x80000001
 cpuid
 test edx, 1<<29
 jz panic16
+mov eax, 0x80000007
+cpuid
+test edx, 1<<8
+jz panic16
 
+jmp second_stage
 
-;;Get memory map and place it at 0x500
+;;;Print string in si to the top left corner using attributes in bl
+print:
+   mov ax, 0xb800
+   mov es, ax
+   xor di, di
+   .loop:
+   lodsb
+   or al, al
+   jz .done
+   mov ah, bl
+   stosw
+   jmp .loop
+   .done:
+   xor ax, ax
+   mov es, ax
+   ret
+
+;;;Print error message in si and halt
+panic16:
+   mov bl, 0x4f
+   call print
+   cli
+   .hlt:
+   hlt
+   jmp .hlt
+
+vga_color_palette_data: ;RGB, from 0x00 to 3f
+db 0x04, 0x14, 0x2e ;Sapphire
+db 0x1f, 0x2c, 0x1a ;Bud Green
+db 0x3c, 0x21, 0x00 ;Tangerine
+db 0x24, 0x00, 0x04 ;Sangria
+db 0x2e, 0x1f, 0x37 ;Lavender
+db 0x06, 0x04, 0x03 ;Licorice
+db 0x31, 0x2f, 0x27 ;Khaki
+db 0x0d, 0x09, 0x07 ;Bistre
+db 0x24, 0x2d, 0x2f ;Pewter Blue
+db 0x14, 0x1e, 0x10 ;Fern Green
+db 0x35, 0x2c, 0x1f ;Light French Beige
+db 0x37, 0x17, 0x20 ;Blush
+db 0x18, 0x14, 0x36 ;Majorelle Blue
+db 0x3c, 0x30, 0x0c ;Saffron
+db 0x3f, 0x3f, 0x3f ;White
+
+a20_error_message: db "Error enabling A20!", 0x00
+cpu_not_supported_message: db "CPU not supported!", 0x00
+drive_read_error_message: db "Error reading from disk!", 0x00
+mem_detect_error_message: db "Error detecting memory!", 0x00
+
+times 510-($-start) db 0 ;Pad first boot sector to 512 bytes.
+dw 0xaa55 ;Boot signature.
+
+second_stage:
+
+;;Place e820 memory map at 0x500
 ;;
 ;;Format:
 ;;0x0000000000000000 Base address
@@ -199,7 +248,7 @@ jz panic16
 
 mov di, 0x500
 xor ebx, ebx
-xor bp, bp ;bp holds the number of entries.
+xor bp, bp ;number of entries
 mov edx, 0x534d4150
 mov ecx, 0x00000018
 mov eax, 0x0000e820
@@ -208,7 +257,7 @@ mov si, mem_detect_error_message
 jc panic16
 inc bp
 
-mem_detect_loop:
+mem_map_loop:
    add di, 0x18
    mov edx, 0x534d4150
    mov eax, 0x0000e820
@@ -217,30 +266,27 @@ mem_detect_loop:
    pushfd
    inc bp
    or ebx, ebx
-   jz mem_detect_done
+   jz mem_map_done
    popfd
-   jnc mem_detect_loop
-   jc mem_detect_done
-
+   jnc mem_map_loop
+   jc mem_map_done
    mov si, mem_detect_error_message
    jmp panic16
-
-mem_detect_done:
-   xor di, di ;;Save number of entries padded to 64 bits.
+mem_map_done:
+   xor di, di ;Save number of entries padded to 64 bits.
    push di
    push di
    push di
    push bp
 
-;; Uncomment this to print the memory map for debugging.
 ;print_mem_map:
 ;   mov si, 0x500
 ;   xor cx, cx
 ;
 ;   .loop:
-;      mov bx, [si + 0x10]
-;      cmp bx, 0x01 ;Filter out a particular type
-;      jne .continue
+;      ;mov bx, [si + 0x10]
+;      ;cmp bx, 0x01 ;Filter out a particular type
+;      ;jne .continue
 ;
 ;      mov bx, [si + 0x06]
 ;      call print_bx
@@ -274,83 +320,14 @@ mem_detect_done:
 ;   cli
 ;   hlt
 
-   
-   jmp second_stage
-
-; Print string in si to the top left corner using attributes in bl
-print:
-   mov ax, 0xb800
-   mov es, ax
-   xor di, di
-   .loop:
-   lodsb
-   or al, al
-   jz .done
-   mov ah, bl
-   stosw
-   jmp .loop
-   .done:
-   xor ax, ax
-   mov es, ax
-   ret
-
-panic16:
-   mov bl, 0x4f
-   call print
-   cli
-   .hlt:
-   hlt
-   jmp .hlt
-
-vga_color_palette_data:
-;;First color is already black so we don't need to set it.
-;;One byte for red, green, then blue. Each are on a scale from 0x00 to 0x3f.
-db 0x04, 0x14, 0x2e ; Sapphire
-db 0x14, 0x1e, 0x10 ; Fern Green
-db 0x3c, 0x21, 0x00 ; Tangerine
-db 0x24, 0x00, 0x0a ; Burgandy
-db 0x18, 0x14, 0x36 ; Majorelle Blue
-db 0x30, 0x26, 0x1a ; Camel
-db 0x2b, 0x2b, 0x2b ; Light Grey
-db 0x0e, 0x0d, 0x0b ; Umber (modified)
-db 0x11, 0x20, 0x2c ; Steel Blue
-db 0x27, 0x2a, 0x08 ; Citron
-db 0x30, 0x3d, 0x28 ; Pistachio
-db 0x37, 0x17, 0x20 ; Blush
-db 0x2d, 0x1f, 0x36 ; Lavender
-db 0x3c, 0x30, 0x0c ; Saffron
-db 0x3f, 0x3f, 0x3f ; White
-;db 0x38, 0x1c, 0x1e ; Tango Pink
-;db 0x37, 0x1b, 0x28 ; China Pink
-;db 0x37, 0x0c, 0x18 ; Cerise
-;db 0x39, 0x0b, 0x14 ; Amaranth
-;db 0x20, 0x00, 0x00 ; Maroon
-;db 0x16, 0x26, 0x23 ; Viridian
-;db 0x0e, 0x0e, 0x0e ; Dark Grey
-;db 0x16, 0x14, 0x12 ; Umber (original)
-
-a20_error_message: db "Error enabling A20!", 0x00
-no_long_mode_message: db "Computer isn't 64 bit!", 0x00
-drive_read_error_message: db "Error reading instalation media!", 0x00
-mem_detect_error_message: db "Error detecting memory!", 0x00
-
-times 510-($-start) db 0 ;Pad first boot sector to 512 bytes.
-dw 0xaa55 ;Boot signature.
-
-second_stage:
-
-;; Notify bios that we will be operating in long mode. (Ostensibly used for
-;; bios optimizations.)
-mov ax, 0xec00
-mov bx, 0x0002
+mov ax, 0xec00 ;Detect Target Operating Mode (Lets BIOS optimize for long mode)
+mov bx, 0x0002 ;Long Mode target only
 int 0x15
 
+;;;Remap PIC to avoid spurrious irqs.
+;;;Master PIC spurious irq: 0xed
+;;;Slave PIC spurious irq: 0xee
 cli
-
-;; Because the PICs can still generate spurious IRQs even when they are
-;; disabled we stil have to remap the IRQs.
-;; Master PIC spurious irq: 0xed
-;; Slave PIC spurious irq: 0xee
 mov al, 0x11 ;;Start PIC initialization
 out 0x20, al
 out 0xa0, al
@@ -415,7 +392,6 @@ mov [es:di], eax
 xor ax, ax
 mov es, ax
 
-
 lidt [dummy_idt]
 
 mov eax, 0xa0       ;;Set PAE and PGE bits
@@ -442,7 +418,7 @@ bootloader_64:
    xor ax, ax
    mov ss, ax
 
-   mov edi, 0x17000
+   mov edi, 0x17000 ;;Setup IDT
    mov rax, 0x00000e0000080000
    xor ebx, ebx
    mov ecx, 0x100
@@ -466,28 +442,20 @@ bootloader_64:
    call install_isr
    lidt [idt_pointer]
 
-   %include "bootloader-64.asm" ;Does some setup then jumps to the kernel.
+   ;;Enable SSE
+   ;mov rax, cr0
+   ;or al, 0x6
+   ;xor al, 0x4
+   ;mov cr0, rax
+   ;mov rax, cr4
+   ;or ax, 0x600
+   ;mov cr4, rax
+
+   %include "bootloader-64.asm"
 
 bits 16
 
-ap_initalization:
-lidt [dummy_idt]
-
-mov eax, 0xa0       ;;Set PAE and PGE bits
-mov cr4, eax
-mov ebx, 0x00010000 ;;Load CR3 with address of PML4
-mov cr3, ebx
-mov ecx, 0xc0000080 ;;Enable long mode by setting LME and LMA in the EFER MSR
-rdmsr
-or eax, 0x00000100
-wrmsr
-mov ebx, cr0        ;;Set protected mode and paging bits
-or ebx, 0x80000001
-mov cr0, ebx
-lgdt [gdt_pointer]
-
-
-;; Print bx in hex at position in di. (Commented to save space when not debugging.)
+;;;Print bx in hex at position in di. (Commented to save space when not debugging.)
 print_bx:
    push si
    push bp
@@ -531,5 +499,55 @@ gdt_pointer:
 dw 0x0020
 dq 0x000000000000a000
 
-times 0x2200-($-second_stage) db 0
+times 0x1200-($-second_stage) db 0
+ap_initialization: ;0x9000
+xor ax, ax ;;Zero segment registers
+mov ss, ax
+mov ds, ax
+mov es, ax
+
+lidt [dummy_idt]
+
+mov eax, 0xa0       ;;Set PAE and PGE bits
+mov cr4, eax
+mov ebx, 0x00010000 ;;Load CR3 with address of PML4
+mov cr3, ebx
+mov ecx, 0xc0000080 ;;Enable long mode by setting LME and LMA in the EFER MSR
+rdmsr
+or eax, 0x00000100
+wrmsr
+mov ebx, cr0        ;;Set protected mode and paging bits
+or ebx, 0x80000001
+mov cr0, ebx
+lgdt [gdt_pointer]
+
+jmp 8:ap_initialization_64
+bits 64
+ap_initialization_64:
+bits 64
+
+mov rsi, [lapic_address]
+mov ecx, [rsi+0x20]
+shr ecx, 0x18
+mov eax, ecx
+and cl, 0x3f
+shr eax, 6
+mov esi, 1
+shl rsi, cl
+not rsi
+and [processor_started_flags+eax*8], rsi
+
+;;;Enable SSE
+;mov rax, cr0
+;or al, 0x6
+;xor al, 0x4
+;mov cr0, rax
+;mov rax, cr4
+;or ax, 0x600
+;mov cr4, rax
+
+cli
+hlt
+
+times 0x1000-($-ap_initialization) db 0
 

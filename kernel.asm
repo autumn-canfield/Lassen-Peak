@@ -66,7 +66,7 @@ print_space:
 panic:
    mov eax, 0x4f
    call clear_screen
-   mov [cursor_location], dword 0x780
+   mov [cursor_location], dword 0xf00
    mov ebx, 0x4f
    call print
    cli
@@ -90,7 +90,7 @@ print:
 
 ; Clear screen with color in eax
 clear_screen:
-   mov ecx, 0x7d0; 80*25 columns*rows
+   mov ecx, 0xfa0 ;80*50 columns*rows
    mov rdi, 0xb8000
    shl eax, 8
    .loop:
