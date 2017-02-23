@@ -147,26 +147,14 @@ a20_enabled:
 xor ax, ax
 mov es, ax
 
-;; Read from drive
-;;
-;;If we were using an actual floppy disk we would reset then try again in case
-;;of failure. Because we have no plans to use a real floppy this is sufficient.
+;;Read second stage and kernel from drive
+;;If we supported real floppy disks we would retry in case of failure.
 mov si, drive_read_error_message
-
-;;Read the second stage of the bootloader.
-pop dx ;Pop drive number from the stack
-mov ax, 0x0211 ;0x2200 bytes (0x11 sectors)
+pop dx
+mov ax, 0x0231 ;0x6400 bytes (0x31 sectors)
 mov cx, 0x0002 ;Cylinder, Sector (one indexed)
 mov dh, 0x00   ;Head
-mov bx, 0x7e00 ;Buffer address
-int 0x13
-jc panic16
-
-;;Read the kernel to 0xa000
-mov ax, 0x0220 ;16 kib (0x20 sectors)
-mov cx, 0x000b ;Cylinder, Sector
-mov dh, 0x00   ;Head
-mov bx, 0xa000 ;Buffer address
+mov bx, 0x7e00 ;Destination address
 int 0x13
 jc panic16
 
@@ -541,7 +529,7 @@ dq 0x0000000000017000
 align 16
 gdt_pointer:
 dw 0x0020
-dq 0x000000000000b000
+dq 0x000000000000a000
 
 times 0x2200-($-second_stage) db 0
 
