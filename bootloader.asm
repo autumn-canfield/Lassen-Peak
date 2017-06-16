@@ -6,27 +6,27 @@
 ;;; 0x3400 len=0x3000 phys=0x0b000 Kernel
 ;;;
 ;;; Map of physical memory below 1 mib:
-;;; 0x00000000       - 0x03ff Default interrupt vector table
-;;; 0x00000400       - 0x04ff Bios data area
-;;; 0x00000500       - (0x500 + 0x18*num_entries) Memory map
-;;; 0x0000????       - 0x7bff Stack
-;;; 0x00007c00       - 0x9fff Bootloader
-;;; 0x0000a000       - 0xafff GDT & kernel data
-;;; 0x0000b000       - 0xefff Kernel (3 pages)
-;;; 0x0000f000       - 0x0000ffff Free (3 pages)
-;;; 0x00010000       - 0x00010fff Default PML4
-;;; 0x00011000       - 0x00011fff Default PDP
-;;; 0x00012000       - 0x00012fff Default PD (first 2mib identity mapped)
-;;; 0x00013000       - 0x00013fff Free
-;;; 0x00014000       - 0x00014fff Kernel PDP
-;;; 0x00015000       - 0x00015fff Kernel PD
-;;; 0x00016000       - 0x00016fff Kernel PT
-;;; 0x00017000       - 0x00017fff IDT
-;;; 0x00018000       - 0x0007ffff Guaranteed free (104 pages)
-;;; 0x00080000       - 0x0009fbff Possibly free depending on EBDA
+;;; 0x00000000		 - 0x03ff Default interrupt vector table
+;;; 0x00000400		 - 0x04ff Bios data area
+;;; 0x00000500		 - (0x500 + 0x18*num_entries) Memory map
+;;; 0x0000????		 - 0x7bff Stack
+;;; 0x00007c00		 - 0x9fff Bootloader
+;;; 0x0000a000		 - 0xafff GDT & kernel data
+;;; 0x0000b000		 - 0xefff Kernel (3 pages)
+;;; 0x0000f000		 - 0x0000ffff Free (3 pages)
+;;; 0x00010000		 - 0x00010fff Default PML4
+;;; 0x00011000		 - 0x00011fff Default PDP
+;;; 0x00012000		 - 0x00012fff Default PD (first 2mib identity mapped)
+;;; 0x00013000		 - 0x00013fff Free
+;;; 0x00014000		 - 0x00014fff Kernel PDP
+;;; 0x00015000		 - 0x00015fff Kernel PD
+;;; 0x00016000		 - 0x00016fff Kernel PT
+;;; 0x00017000		 - 0x00017fff IDT
+;;; 0x00018000		 - 0x0007ffff Guaranteed free (104 pages)
+;;; 0x00080000		 - 0x0009fbff Possibly free depending on EBDA
 ;;; 0x0009fc00 (typ) - 0x0009ffff Extended bios data area
-;;; 0x000a0000       - 0x000bffff Video memory
-;;; 0x000c0000       - 0x000fffff Rom area
+;;; 0x000a0000		 - 0x000bffff Video memory
+;;; 0x000c0000		 - 0x000fffff Rom area
 ;;;
 ;;; 0x00000000 contains info as specified in "boot-info-table.asm"
 ;;;
@@ -106,15 +106,15 @@ int 0x10
 ;xor ax, ax
 ;xor bx, bx
 ;color_loop:
-;   mov [fs:bx], ax
-;   add bx, 0x0002
-;   add ax, 0x0101
-;   cmp al, 0xff
-;   jne .end
-;   mov al, 0x00
-;   .end:
-;   cmp bx, 0x1000
-;   jne color_loop
+;	mov [fs:bx], ax
+;	add bx, 0x0002
+;	add ax, 0x0101
+;	cmp al, 0xff
+;	jne .end
+;	mov al, 0x00
+;	.end:
+;	cmp bx, 0x1000
+;	jne color_loop
 ;cli
 ;hlt
 
@@ -125,17 +125,17 @@ mov es, ax
 call test_a20
 jne a20_enabled
 enable_a20:
-   mov ax, 0x2401
-   int 0x15
-   call test_a20
-   jne a20_enabled
-   mov si, a20_error_message
-   jmp panic16
+	mov ax, 0x2401
+	int 0x15
+	call test_a20
+	jne a20_enabled
+	mov si, a20_error_message
+	jmp panic16
 test_a20:
-   mov word [0x7dfe], 0xabcd
-   mov cx, [es:0x7e0e]
-   cmp cx, 0xabcd
-   ret
+	mov word [0x7dfe], 0xabcd
+	mov cx, [es:0x7e0e]
+	cmp cx, 0xabcd
+	ret
 a20_enabled:
 xor ax, ax
 mov es, ax
@@ -146,7 +146,7 @@ mov si, drive_read_error_message
 pop dx
 mov ax, 0x0231 ;0x6400 bytes (0x31 sectors)
 mov cx, 0x0002 ;Cylinder, Sector (one indexed)
-mov dh, 0x00   ;Head
+mov dh, 0x00	;Head
 mov bx, 0x7e00 ;Destination address
 int 0x13
 jc panic16
@@ -180,29 +180,29 @@ jmp second_stage
 
 ;;;Print string in si to the top left corner using attributes in bl
 print:
-   mov ax, 0xb800
-   mov es, ax
-   xor di, di
-   .loop:
-   lodsb
-   or al, al
-   jz .done
-   mov ah, bl
-   stosw
-   jmp .loop
-   .done:
-   xor ax, ax
-   mov es, ax
-   ret
+	mov ax, 0xb800
+	mov es, ax
+	xor di, di
+	.loop:
+	lodsb
+	or al, al
+	jz .done
+	mov ah, bl
+	stosw
+	jmp .loop
+	.done:
+	xor ax, ax
+	mov es, ax
+	ret
 
 ;;;Print error message in si and halt
 panic16:
-   mov bl, 0x4f
-   call print
-   cli
-   .hlt:
-   hlt
-   jmp .hlt
+	mov bl, 0x4f
+	call print
+	cli
+	.hlt:
+	hlt
+	jmp .hlt
 
 vga_color_palette_data: ;RGB, from 0x00 to 3f
 db 0x04, 0x14, 0x2e ;Sapphire
@@ -236,8 +236,8 @@ second_stage:
 ;;Format:
 ;;0x0000000000000000 Base address
 ;;0x0000000000000000 Length of region
-;;0x00000000         Type of region
-;;0x00000000         Padding
+;;0x00000000			Type of region
+;;0x00000000			Padding
 ;;
 ;;Values for Type field:
 ;;0x01 Available
@@ -258,67 +258,67 @@ jc panic16
 inc bp
 
 mem_map_loop:
-   add di, 0x18
-   mov edx, 0x534d4150
-   mov eax, 0x0000e820
-   mov ecx, 0x00000018
-   int 0x15
-   pushfd
-   inc bp
-   or ebx, ebx
-   jz mem_map_done
-   popfd
-   jnc mem_map_loop
-   jc mem_map_done
-   mov si, mem_detect_error_message
-   jmp panic16
+	add di, 0x18
+	mov edx, 0x534d4150
+	mov eax, 0x0000e820
+	mov ecx, 0x00000018
+	int 0x15
+	pushfd
+	inc bp
+	or ebx, ebx
+	jz mem_map_done
+	popfd
+	jnc mem_map_loop
+	jc mem_map_done
+	mov si, mem_detect_error_message
+	jmp panic16
 mem_map_done:
-   xor di, di ;Save number of entries padded to 64 bits.
-   push di
-   push di
-   push di
-   push bp
+	xor di, di ;Save number of entries padded to 64 bits.
+	push di
+	push di
+	push di
+	push bp
 
 ;print_mem_map:
-;   mov si, 0x500
-;   xor cx, cx
+;	mov si, 0x500
+;	xor cx, cx
 ;
-;   .loop:
-;      ;mov bx, [si + 0x10]
-;      ;cmp bx, 0x01 ;Filter out a particular type
-;      ;jne .continue
+;	.loop:
+;		;mov bx, [si + 0x10]
+;		;cmp bx, 0x01 ;Filter out a particular type
+;		;jne .continue
 ;
-;      mov bx, [si + 0x06]
-;      call print_bx
-;      mov bx, [si + 0x04]
-;      call print_bx
-;      mov bx, [si + 0x02]
-;      call print_bx
-;      mov bx, [si]
-;      call print_bx
+;		mov bx, [si + 0x06]
+;		call print_bx
+;		mov bx, [si + 0x04]
+;		call print_bx
+;		mov bx, [si + 0x02]
+;		call print_bx
+;		mov bx, [si]
+;		call print_bx
 ;
-;      add di, 0x02
-;      mov bx, [si + 0x0e]
-;      call print_bx
-;      mov bx, [si + 0x0c]
-;      call print_bx
-;      mov bx, [si + 0x0a]
-;      call print_bx
-;      mov bx, [si + 0x08]
-;      call print_bx
+;		add di, 0x02
+;		mov bx, [si + 0x0e]
+;		call print_bx
+;		mov bx, [si + 0x0c]
+;		call print_bx
+;		mov bx, [si + 0x0a]
+;		call print_bx
+;		mov bx, [si + 0x08]
+;		call print_bx
 ;
-;      add di, 0x02
-;      mov bx, [si + 0x10]
-;      call print_bx
+;		add di, 0x02
+;		mov bx, [si + 0x10]
+;		call print_bx
 ;
-;      add di, 0x54
-;   .continue
-;      add si, 0x18
-;      add cx, 1
-;      cmp cx, bp
-;      jl .loop
-;   cli
-;   hlt
+;		add di, 0x54
+;	.continue
+;		add si, 0x18
+;		add cx, 1
+;		cmp cx, bp
+;		jl .loop
+;	cli
+;	hlt
 
 mov ax, 0xec00 ;Detect Target Operating Mode (Lets BIOS optimize for long mode)
 mov bx, 0x0002 ;Long Mode target only
@@ -349,14 +349,14 @@ nop
 nop
 
 ;;;Set up page tables
-mov ax, 0x1000      ;;Zero 0x10000 to 0x18000
+mov ax, 0x1000		;;Zero 0x10000 to 0x18000
 mov es, ax
 mov ecx, 0x00002000
 xor edi, edi
 xor eax, eax
 cld
 rep stosd
-xor di, di          ;;Add first entry in PML4
+xor di, di			 ;;Add first entry in PML4
 mov eax, 0x00011003
 mov [es:di], eax
 mov eax, 0x00012003 ;;Add first entry in PDP
@@ -368,13 +368,13 @@ mov [es:di + 0x2000], eax
 add eax, 0x200000
 add di, 0x0008
 loop fill_page_table
-mov di, 0x0ff0      ;;Add second to last entry in PML4 for the kernel
+mov di, 0x0ff0		;;Add second to last entry in PML4 for the kernel
 mov eax, 0x00014003
 mov [es:di], eax
-mov di, 0x4ff0      ;;Add second to last entry in PDP for the kernel
+mov di, 0x4ff0		;;Add second to last entry in PDP for the kernel
 mov eax, 0x00015003
 mov [es:di], eax
-mov di, 0x5fe0      ;;Add fourth to last entry in PD
+mov di, 0x5fe0		;;Add fourth to last entry in PD
 mov eax, 0x00016003
 mov [es:di], eax
 mov eax, 0x0000a003 ;;Add first four entries to PT
@@ -385,7 +385,7 @@ mov [es:di], eax
 add eax, 0x1000
 add di, 0x0008
 loop fill_2nd_page_table
-mov di, 0x0ff8      ;;Add last entry in PML4 for recursive paging
+mov di, 0x0ff8		;;Add last entry in PML4 for recursive paging
 mov eax, 0x00010003
 mov [es:di], eax
 
@@ -394,7 +394,7 @@ mov es, ax
 
 lidt [dummy_idt]
 
-mov eax, 0xa0       ;;Set PAE and PGE bits
+mov eax, 0xa0		 ;;Set PAE and PGE bits
 mov cr4, eax
 mov ebx, 0x00010000 ;;Load CR3 with address of PML4
 mov cr3, ebx
@@ -402,7 +402,7 @@ mov ecx, 0xc0000080 ;;Enable long mode by setting LME and LMA in the EFER MSR
 rdmsr
 or eax, 0x00000100
 wrmsr
-mov ebx, cr0        ;;Set protected mode and paging bits
+mov ebx, cr0		  ;;Set protected mode and paging bits
 or ebx, 0x80000001
 mov cr0, ebx
 
@@ -410,81 +410,81 @@ lgdt [gdt_pointer]
 jmp 8:bootloader_64
 bits 64
 bootloader_64:
-   mov ax, 0x10 ;;Initialize segment registers.
-   mov ds, ax
-   mov es, ax
-   mov fs, ax
-   mov gs, ax
-   xor ax, ax
-   mov ss, ax
+	mov ax, 0x10 ;;Initialize segment registers.
+	mov ds, ax
+	mov es, ax
+	mov fs, ax
+	mov gs, ax
+	xor ax, ax
+	mov ss, ax
 
-   mov edi, 0x17000 ;;Setup IDT
-   mov rax, 0x00000e0000080000
-   xor ebx, ebx
-   mov ecx, 0x100
-   .idt_loop:
-      mov [rdi], rax
-      mov [rdi+0x08], rbx
-      add edi, 0x10
-      sub ecx, 0x01
-      jnz .idt_loop
-   mov rsi, page_fault_isr
-   mov rdi, 0x0e
-   call install_isr
-   mov rsi, mpic_spurious_isr
-   mov rdi, 0xed
-   call install_isr
-   mov rsi, spic_spurious_isr
-   mov rdi, 0xee
-   call install_isr
-   mov rsi, spurious_isr
-   mov rdi, 0xef
-   call install_isr
-   lidt [idt_pointer]
+	mov edi, 0x17000 ;;Setup IDT
+	mov rax, 0x00000e0000080000
+	xor ebx, ebx
+	mov ecx, 0x100
+	.idt_loop:
+		mov [rdi], rax
+		mov [rdi+0x08], rbx
+		add edi, 0x10
+		sub ecx, 0x01
+		jnz .idt_loop
+	mov rsi, page_fault_isr
+	mov rdi, 0x0e
+	call install_isr
+	mov rsi, mpic_spurious_isr
+	mov rdi, 0xed
+	call install_isr
+	mov rsi, spic_spurious_isr
+	mov rdi, 0xee
+	call install_isr
+	mov rsi, spurious_isr
+	mov rdi, 0xef
+	call install_isr
+	lidt [idt_pointer]
 
-   ;;Enable SSE
-   ;mov rax, cr0
-   ;or al, 0x6
-   ;xor al, 0x4
-   ;mov cr0, rax
-   ;mov rax, cr4
-   ;or ax, 0x600
-   ;mov cr4, rax
+	;;Enable SSE
+	;mov rax, cr0
+	;or al, 0x6
+	;xor al, 0x4
+	;mov cr0, rax
+	;mov rax, cr4
+	;or ax, 0x600
+	;mov cr4, rax
 
-   %include "bootloader-64.asm"
+	%include "bootloader-64.asm"
 
 bits 16
 
 ;;;Print bx in hex at position in di. (Commented to save space when not debugging.)
 print_bx:
-   push si
-   push bp
-   push cx
-   mov ax, 0xb800
-   mov es, ax
+	push si
+	push bp
+	push cx
+	mov ax, 0xb800
+	mov es, ax
 
-   mov cx, 0x4
-   mov si, 0x30
-   mov bp, 0x57
+	mov cx, 0x4
+	mov si, 0x30
+	mov bp, 0x57
 
-   .loop:
-   mov dl, bh
-   shr dl, 4
-   cmp dl, 0x09
-   cmovle ax, si
-   cmovg ax, bp
-   add al, dl
-   mov ah, 0x07
-   stosw
-   shl bx, 4
-   loop .loop
+	.loop:
+	mov dl, bh
+	shr dl, 4
+	cmp dl, 0x09
+	cmovle ax, si
+	cmovg ax, bp
+	add al, dl
+	mov ah, 0x07
+	stosw
+	shl bx, 4
+	loop .loop
 
-   xor ax, ax
-   mov es, ax
-   pop cx
-   pop bp
-   pop si
-   ret
+	xor ax, ax
+	mov es, ax
+	pop cx
+	pop bp
+	pop si
+	ret
 
 align 16
 dummy_idt:
@@ -508,7 +508,7 @@ mov es, ax
 
 lidt [dummy_idt]
 
-mov eax, 0xa0       ;;Set PAE and PGE bits
+mov eax, 0xa0		 ;;Set PAE and PGE bits
 mov cr4, eax
 mov ebx, 0x00010000 ;;Load CR3 with address of PML4
 mov cr3, ebx
@@ -516,7 +516,7 @@ mov ecx, 0xc0000080 ;;Enable long mode by setting LME and LMA in the EFER MSR
 rdmsr
 or eax, 0x00000100
 wrmsr
-mov ebx, cr0        ;;Set protected mode and paging bits
+mov ebx, cr0		  ;;Set protected mode and paging bits
 or ebx, 0x80000001
 mov cr0, ebx
 lgdt [gdt_pointer]
