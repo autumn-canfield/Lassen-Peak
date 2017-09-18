@@ -6,7 +6,7 @@
 ;;; 0x3400 len=0x3000 phys=0x0b000 Kernel
 ;;;
 ;;; Map of physical memory below 1 mib:
-;;; 0x00000000		 - 0x03ff Default interrupt vector table
+;;; 0x00000000		 - 0x03ff Real Mode IVT, boot-info-table
 ;;; 0x00000400		 - 0x04ff Bios data area
 ;;; 0x00000500		 - (0x500 + 0x18*num_entries) Memory map
 ;;; 0x0000????		 - 0x7bff Stack
@@ -16,13 +16,15 @@
 ;;; 0x0000f000		 - 0x0000ffff Free (3 pages)
 ;;; 0x00010000		 - 0x00010fff Default PML4
 ;;; 0x00011000		 - 0x00011fff Default PDP
-;;; 0x00012000		 - 0x00012fff Default PD (first 2mib identity mapped)
+;;; 0x00012000		 - 0x00012fff Default PD (512 2mib pages identity mapped)
 ;;; 0x00013000		 - 0x00013fff Free
 ;;; 0x00014000		 - 0x00014fff Kernel PDP
 ;;; 0x00015000		 - 0x00015fff Kernel PD
 ;;; 0x00016000		 - 0x00016fff Kernel PT
 ;;; 0x00017000		 - 0x00017fff IDT
-;;; 0x00018000		 - 0x0007ffff Guaranteed free (104 pages)
+;;; 0x00018000		 - 0x000????? Free
+;;; 0x000?????       - 0x00079000 next_free_page (grows down)
+;;; 0x0007a000       - 0x0007ffff Free
 ;;; 0x00080000		 - 0x0009fbff Possibly free depending on EBDA
 ;;; 0x0009fc00 (typ) - 0x0009ffff Extended bios data area
 ;;; 0x000a0000		 - 0x000bffff Video memory
@@ -30,7 +32,8 @@
 ;;;
 ;;; 0x00000000 contains info as specified in "boot-info-table.asm"
 ;;;
-;;; The default page tables map the kernel to 0xffffff7fbf800000.
+;;; Default page tables identity-map memory from 0x00000000 to 0x40000000,
+;;; and map the kernel to 0xffffff7fbf800000.
 ;;; 
 ;;; Once the kernel has setup an idt, created a new stack, and is done with the
 ;;; memory map, the memory from 0x0000 to 0x9000 can be used for other purposes.
@@ -39,8 +42,6 @@
 ;;; initial page tables to higher addresses and reading more sectors for the
 ;;; kernel. However, if it grows larger than 1 mib we have to either load the
 ;;; rest in first part of the kernel, or switch to unreal mode.
-;;; 
-;;; Initial page tables identity-map memory from 0x00000000 to 0x40000000.
 ;;;
 ;;; The last entry of the PML4 is mapped to itself. Meaning that addresses from
 ;;; ffffff8000000000 to ffffffffffffffff can be used to modify any entry in the
